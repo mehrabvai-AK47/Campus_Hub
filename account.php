@@ -1,0 +1,16 @@
+<?php
+require 'config.php';
+require_login();
+$user = current_user();
+$statsStmt = db()->prepare("SELECT COUNT(*) order_count, COALESCE(SUM(CASE WHEN status='paid' THEN total ELSE 0 END),0) spent FROM orders WHERE user_id=?");
+$statsStmt->bind_param('i', $user['id']);
+$statsStmt->execute();
+$stats = $statsStmt->get_result()->fetch_assoc();
+$stmt = db()->prepare('SELECT o.*,COUNT(oi.id) item_count FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.user_id=? GROUP BY o.id ORDER BY o.created_at DESC');
+$stmt->bind_param('i', $user['id']);
+$stmt->execute();
+$orders = $stmt->get_result();
+page_start('My dashboard');
+?>
+<section class="section-space"><div class="container"><div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-5"><div><div class="eyebrow">Personal dashboard</div><h1 class="display-5 mb-0">Welcome back, <?= e($user['name']) ?>.</h1><p class="text-muted mt-2 mb-0">Your digital library and account activity in one place.</p></div><div class="d-flex gap-2"><a class="btn btn-outline-dark btn-rounded" href="profile.php">Edit profile</a><a class="btn btn-dark btn-rounded" href="products.php">Explore library</a></div></div><div class="row g-3 mb-5"><div class="col-md-4"><div class="stat"><div class="text-muted small">Orders placed</div><div class="h3 mb-0"><?= (int)$stats['order_count'] ?></div></div></div><div class="col-md-4"><div class="stat"><div class="text-muted small">Total spent</div><div class="h3 mb-0"><?= money((float)$stats['spent']) ?></div></div></div><div class="col-md-4"><div class="stat"><div class="text-muted small">Account email</div><div class="h6 mb-0 mt-2 text-break"><?= e($user['email']) ?></div></div></div></div><div class="row g-4"><div class="col-lg-8"><h2 class="h4 mb-3">Purchase history</h2><div class="bg-white rounded-3 p-3"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Status</th><th>Total</th></tr></thead><tbody><?php while($order=$orders->fetch_assoc()): ?><tr><td>#<?= $order['id'] ?></td><td><?= date('M j, Y',strtotime($order['created_at'])) ?></td><td><?= (int)$order['item_count'] ?></td><td><span class="badge bg-success-subtle text-success"><?= e($order['status']) ?></span></td><td><?= money((float)$order['total']) ?></td></tr><?php endwhile; if($orders->num_rows===0): ?><tr><td colspan="5" class="text-muted py-4">Your downloads will appear here after checkout.</td></tr><?php endif; ?></tbody></table></div></div></div><div class="col-lg-4"><div class="stat mb-3"><div class="eyebrow">Account settings</div><h2 class="h5 mt-2">Keep things current.</h2><p class="small text-muted">Update your profile, change your password, or request a password reset.</p><a href="profile.php" class="text-dark fw-bold">Manage account →</a></div><div class="stat"><div class="eyebrow">Need a hand?</div><h2 class="h5 mt-2">Talk to support.</h2><a href="contact.php" class="text-dark fw-bold">Open a ticket →</a></div></div></div></div></section>
+<?php page_end(); ?>
